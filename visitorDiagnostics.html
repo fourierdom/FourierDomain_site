@@ -191,7 +191,6 @@
         <div class="row"><span class="key">Reverse DNS</span><span class="val pending" data-field="rdns">resolving</span></div>
         <div class="row"><span class="key">ASN / ISP</span><span class="val pending" data-field="asn">resolving</span></div>
         <div class="row"><span class="key">Geolocation</span><span class="val pending" data-field="geo">resolving</span></div>
-        <div class="row"><span class="key">Connection Type</span><span class="val" data-field="conn">—</span></div>
     </div>
 
     <h2>Browser & Device</h2>
@@ -263,18 +262,6 @@
         set('dnt', navigator.doNotTrack === '1' ? 'enabled' : 'not set');
         set('cookies', navigator.cookieEnabled ? 'yes' : 'no');
         set('sw', 'serviceWorker' in navigator ? 'supported' : 'not supported');
-
-        // Connection
-        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-        if (conn) {
-            const parts = [];
-            if (conn.effectiveType) parts.push(conn.effectiveType);
-            if (conn.downlink) parts.push(`~${conn.downlink} Mbps down`);
-            if (conn.rtt) parts.push(`${conn.rtt}ms rtt`);
-            set('conn', parts.join(' · ') || 'available');
-        } else {
-            set('conn', 'not exposed by this browser');
-        }
 
         // HTTP version is not directly available; infer from performance entry if possible
         try {
