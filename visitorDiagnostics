@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visitor Diagnostics | Fourier Domain Systems</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --fg: #e6edf3;
+            --accent: #2f81f7;
+            --dim: #7d8590;
+            --border: #30363d;
+            --good: #3fb950;
+            --warn: #d29922;
+            --bad: #f85149;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0 0 0.2em;
+            letter-spacing: -0.02em;
+            font-weight: 600;
+        }
+
+        h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.01em;
+        }
+
+        .terminal-sub {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            color: var(--accent);
+            font-size: 0.9rem;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .intro {
+            color: var(--dim);
+            font-size: 1.05rem;
+            margin-bottom: 2rem;
+        }
+
+        .intro .highlight { color: var(--fg); }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+
+        .back-link {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.85rem;
+            display: inline-block;
+            margin-bottom: 2rem;
+        }
+
+        /* Data table */
+        .data-block {
+            background: #161b22;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 1rem;
+            padding: 0.85rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.88rem;
+            align-items: baseline;
+        }
+        .row:last-child { border-bottom: none; }
+
+        .row .key {
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.78rem;
+        }
+
+        .row .val {
+            color: var(--fg);
+            word-break: break-word;
+        }
+
+        .row .val.muted { color: var(--dim); }
+
+        /* Status indicators */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--dim);
+            flex-shrink: 0;
+        }
+        .dot.good { background: var(--good); box-shadow: 0 0 8px rgba(63,185,80,0.4); }
+        .dot.warn { background: var(--warn); box-shadow: 0 0 8px rgba(210,153,34,0.4); }
+        .dot.bad  { background: var(--bad);  box-shadow: 0 0 8px rgba(248,81,73,0.4); }
+
+        .note {
+            font-size: 0.8rem;
+            color: var(--dim);
+            margin-top: 0.35rem;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .pending {
+            color: var(--dim);
+            font-style: italic;
+        }
+        .pending::after {
+            content: "";
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            margin-left: 6px;
+            background: var(--dim);
+            border-radius: 50%;
+            animation: pulse 1.2s ease-in-out infinite;
+            vertical-align: middle;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .disclaimer {
+            margin-top: 4rem;
+            padding: 1.25rem 1.5rem;
+            background: #161b22;
+            border-left: 2px solid var(--accent);
+            border-radius: 0 6px 6px 0;
+            font-size: 0.88rem;
+            color: var(--dim);
+        }
+        .disclaimer strong { color: var(--fg); }
+
+        @media (max-width: 600px) {
+            body { padding: 40px 20px; }
+            .row {
+                grid-template-columns: 1fr;
+                gap: 0.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-link">&lt; back</a>
+
+    <header>
+        <h1>Visitor Diagnostics</h1>
+        <div class="terminal-sub">>> What this site sees when you connect</div>
+    </header>
+
+    <p class="intro">Below is a snapshot of what your browser and network share with any server you talk to — collected passively, in your browser, with no scanning of your network. Refresh to re-run.</p>
+
+    <h2>Network</h2>
+    <div class="data-block" id="network-block">
+        <div class="row"><span class="key">Public IP (v4)</span><span class="val pending" data-field="ipv4">resolving</span></div>
+        <div class="row"><span class="key">Public IP (v6)</span><span class="val pending" data-field="ipv6">resolving</span></div>
+        <div class="row"><span class="key">Reverse DNS</span><span class="val pending" data-field="rdns">resolving</span></div>
+        <div class="row"><span class="key">ASN / ISP</span><span class="val pending" data-field="asn">resolving</span></div>
+        <div class="row"><span class="key">Geolocation</span><span class="val pending" data-field="geo">resolving</span></div>
+        <div class="row"><span class="key">Connection Type</span><span class="val" data-field="conn">—</span></div>
+    </div>
+
+    <h2>Browser & Device</h2>
+    <div class="data-block">
+        <div class="row"><span class="key">User Agent</span><span class="val" data-field="ua">—</span></div>
+        <div class="row"><span class="key">Platform</span><span class="val" data-field="platform">—</span></div>
+        <div class="row"><span class="key">Language</span><span class="val" data-field="lang">—</span></div>
+        <div class="row"><span class="key">Timezone</span><span class="val" data-field="tz">—</span></div>
+        <div class="row"><span class="key">Screen</span><span class="val" data-field="screen">—</span></div>
+        <div class="row"><span class="key">Viewport</span><span class="val" data-field="viewport">—</span></div>
+        <div class="row"><span class="key">Color Depth</span><span class="val" data-field="color">—</span></div>
+        <div class="row"><span class="key">Hardware Concurrency</span><span class="val" data-field="cores">—</span></div>
+        <div class="row"><span class="key">Device Memory</span><span class="val" data-field="mem">—</span></div>
+        <div class="row"><span class="key">Touch Points</span><span class="val" data-field="touch">—</span></div>
+        <div class="row"><span class="key">Do Not Track</span><span class="val" data-field="dnt">—</span></div>
+    </div>
+
+    <h2>Fingerprinting Surface</h2>
+    <div class="data-block">
+        <div class="row"><span class="key">Canvas Hash</span><span class="val" data-field="canvas">—</span></div>
+        <div class="row"><span class="key">WebGL Vendor</span><span class="val" data-field="webgl-vendor">—</span></div>
+        <div class="row"><span class="key">WebGL Renderer</span><span class="val" data-field="webgl-renderer">—</span></div>
+        <div class="row"><span class="key">Audio Context</span><span class="val" data-field="audio">—</span></div>
+    </div>
+
+    <h2>WebRTC Inspection</h2>
+    <div class="data-block">
+        <div class="row"><span class="key">Local IP (LAN)</span><span class="val pending" data-field="webrtc-local">probing</span></div>
+        <div class="row"><span class="key">Public IP (STUN)</span><span class="val pending" data-field="webrtc-public">probing</span></div>
+    </div>
+    <p class="note" style="margin-top:0.75rem;">WebRTC can expose your internal LAN address (e.g. 192.168.x.x) to any website you visit, even behind a VPN. This is often unexpected.</p>
+
+    <h2>Protocol Support</h2>
+    <div class="data-block">
+        <div class="row"><span class="key">HTTP Version</span><span class="val" data-field="http">—</span></div>
+        <div class="row"><span class="key">TLS</span><span class="val" data-field="tls">handled by browser; not exposed to JS</span></div>
+        <div class="row"><span class="key">Cookies Enabled</span><span class="val" data-field="cookies">—</span></div>
+        <div class="row"><span class="key">Service Workers</span><span class="val" data-field="sw">—</span></div>
+    </div>
+
+    <div class="disclaimer">
+        <strong>About this page.</strong> All data above is collected passively in your browser. No port scans, no probes against your network, no third-party trackers. Nothing is stored or transmitted to us beyond the standard request log any web server keeps. The point isn't to alarm you — it's to show what's routinely exposed by any connection, and what an attentive engineer notices when designing a network.
+    </div>
+
+    <script>
+        // ---- helpers ----
+        const set = (field, value, statusClass) => {
+            const el = document.querySelector(`[data-field="${field}"]`);
+            if (!el) return;
+            el.classList.remove('pending');
+            if (statusClass) {
+                el.innerHTML = `<span class="status"><span class="dot ${statusClass}"></span>${value}</span>`;
+            } else {
+                el.textContent = value;
+            }
+        };
+
+        // ---- Browser & device (synchronous) ----
+        set('ua', navigator.userAgent);
+        set('platform', navigator.platform || navigator.userAgentData?.platform || 'unknown');
+        set('lang', navigator.languages ? navigator.languages.join(', ') : navigator.language);
+        set('tz', Intl.DateTimeFormat().resolvedOptions().timeZone + ' (UTC' + (-new Date().getTimezoneOffset()/60 >= 0 ? '+' : '') + (-new Date().getTimezoneOffset()/60) + ')');
+        set('screen', `${screen.width} × ${screen.height}`);
+        set('viewport', `${window.innerWidth} × ${window.innerHeight}`);
+        set('color', `${screen.colorDepth}-bit`);
+        set('cores', navigator.hardwareConcurrency || 'unknown');
+        set('mem', navigator.deviceMemory ? `${navigator.deviceMemory} GB (approx)` : 'not exposed');
+        set('touch', navigator.maxTouchPoints);
+        set('dnt', navigator.doNotTrack === '1' ? 'enabled' : 'not set');
+        set('cookies', navigator.cookieEnabled ? 'yes' : 'no');
+        set('sw', 'serviceWorker' in navigator ? 'supported' : 'not supported');
+
+        // Connection
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+            const parts = [];
+            if (conn.effectiveType) parts.push(conn.effectiveType);
+            if (conn.downlink) parts.push(`~${conn.downlink} Mbps down`);
+            if (conn.rtt) parts.push(`${conn.rtt}ms rtt`);
+            set('conn', parts.join(' · ') || 'available');
+        } else {
+            set('conn', 'not exposed by this browser');
+        }
+
+        // HTTP version is not directly available; infer from performance entry if possible
+        try {
+            const nav = performance.getEntriesByType('navigation')[0];
+            set('http', nav?.nextHopProtocol || 'unknown');
+        } catch { set('http', 'unknown'); }
+
+        // ---- Canvas fingerprint ----
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 200; canvas.height = 40;
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#f60';
+            ctx.fillRect(0, 0, 200, 40);
+            ctx.fillStyle = '#069';
+            ctx.fillText('fourier-domain-fp-' + 0xABCDEF, 2, 2);
+            const data = canvas.toDataURL();
+            // Simple non-crypto hash
+            let h = 0;
+            for (let i = 0; i < data.length; i++) {
+                h = ((h << 5) - h) + data.charCodeAt(i);
+                h |= 0;
+            }
+            set('canvas', (h >>> 0).toString(16));
+        } catch { set('canvas', 'blocked'); }
+
+        // ---- WebGL ----
+        try {
+            const gl = document.createElement('canvas').getContext('webgl') ||
+                       document.createElement('canvas').getContext('experimental-webgl');
+            if (gl) {
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                set('webgl-vendor', dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR));
+                set('webgl-renderer', dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+            } else {
+                set('webgl-vendor', 'unavailable');
+                set('webgl-renderer', 'unavailable');
+            }
+        } catch {
+            set('webgl-vendor', 'blocked');
+            set('webgl-renderer', 'blocked');
+        }
+
+        // ---- Audio fingerprint (lightweight) ----
+        try {
+            const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            if (AC) {
+                const ac = new AC(1, 44100, 44100);
+                const osc = ac.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.value = 10000;
+                const comp = ac.createDynamicsCompressor();
+                osc.connect(comp);
+                comp.connect(ac.destination);
+                osc.start(0);
+                ac.startRendering().then(buf => {
+                    let sum = 0;
+                    const d = buf.getChannelData(0);
+                    for (let i = 4500; i < 5000; i++) sum += Math.abs(d[i]);
+                    set('audio', sum.toFixed(8));
+                }).catch(() => set('audio', 'blocked'));
+            } else {
+                set('audio', 'unavailable');
+            }
+        } catch { set('audio', 'blocked'); }
+
+        // ---- Network (public IP via ipify, ASN/geo via ipapi.co) ----
+        // These are public, free, no-auth endpoints. Replace with self-hosted for production.
+        (async () => {
+            try {
+                const r = await fetch('https://api.ipify.org?format=json');
+                const j = await r.json();
+                set('ipv4', j.ip);
+
+                // Enrichment
+                try {
+                    const r2 = await fetch(`https://ipapi.co/${j.ip}/json/`);
+                    const j2 = await r2.json();
+                    set('rdns', j2.org || 'unavailable');
+                    set('asn', `${j2.asn || '—'} · ${j2.org || '—'}`);
+                    set('geo', [j2.city, j2.region, j2.country_name].filter(Boolean).join(', ') || 'unavailable');
+                } catch {
+                    set('rdns', 'lookup failed');
+                    set('asn', 'lookup failed');
+                    set('geo', 'lookup failed');
+                }
+            } catch {
+                set('ipv4', 'lookup failed');
+            }
+
+            try {
+                const r = await fetch('https://api64.ipify.org?format=json');
+                const j = await r.json();
+                // api64 returns v6 if available, else v4
+                if (j.ip.includes(':')) set('ipv6', j.ip);
+                else set('ipv6', 'no IPv6 detected', 'warn');
+            } catch {
+                set('ipv6', 'lookup failed');
+            }
+        })();
+
+        // ---- WebRTC IP probe ----
+        (async () => {
+            try {
+                const pc = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+                const locals = new Set();
+                const publics = new Set();
+                pc.createDataChannel('');
+                pc.onicecandidate = (e) => {
+                    if (!e.candidate) return;
+                    const c = e.candidate.candidate;
+                    const m = c.match(/([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9:]+:[a-f0-9:]+)/i);
+                    if (!m) return;
+                    const ip = m[1];
+                    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|fe80:|fd|fc)/i.test(ip) ||
+                        ip.endsWith('.local')) {
+                        locals.add(ip);
+                    } else {
+                        publics.add(ip);
+                    }
+                };
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                setTimeout(() => {
+                    set('webrtc-local', locals.size ? [...locals].join(', ') : 'none observed (mDNS obfuscation likely)');
+                    set('webrtc-public', publics.size ? [...publics].join(', ') : 'none observed');
+                    pc.close();
+                }, 2500);
+            } catch {
+                set('webrtc-local', 'blocked');
+                set('webrtc-public', 'blocked');
+            }
+        })();
+    </script>
+
+</body>
+</html>
