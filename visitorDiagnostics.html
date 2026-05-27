@@ -381,37 +381,48 @@
 
         // ---- WebRTC IP probe ----
         (async () => {
-            try {
-                const pc = new RTCPeerConnection({
-                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-                });
-                const locals = new Set();
-                const publics = new Set();
-                pc.createDataChannel('');
-                pc.onicecandidate = (e) => {
-                    if (!e.candidate) return;
-                    const c = e.candidate.candidate;
-                    const m = c.match(/([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9:]+:[a-f0-9:]+)/i);
-                    if (!m) return;
-                    const ip = m[1];
-                    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|fe80:|fd|fc)/i.test(ip) ||
-                        ip.endsWith('.local')) {
-                        locals.add(ip);
-                    } else {
-                        publics.add(ip);
-                    }
-                };
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                setTimeout(() => {
-                    set('webrtc-local', locals.size ? [...locals].join(', ') : 'none observed (mDNS obfuscation likely)');
-                    set('webrtc-public', publics.size ? [...publics].join(', ') : 'none observed');
-                    pc.close();
-                }, 2500);
-            } catch {
-                set('webrtc-local', 'blocked');
-                set('webrtc-public', 'blocked');
-            }
+                try {
+                    const pc = new RTCPeerConnection({
+                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                    });
+                    const locals = new Set();
+                    const publics = new Set();
+                    pc.createDataChannel('');
+                    
+                    pc.onicecandidate = (e) => {
+                        if (!e.candidate) return;
+                        const c = e.candidate.candidate;
+                        
+                        // Hardened Regex: IPv6 pattern now enforces 2 to 7 colon blocks, 
+                        // completely ignoring single-colon browser tracking artifacts like "e:627845278".
+                        const m = c.match(/([0-9]{1,3}(\.[0-9]{1,3}){3}|(?:[a-f0-9]{1,4}:){2,7}[a-f0-9]{1,4})/i);
+                        if (!m) return;
+                        
+                        const ip = m[1];
+                        
+                        // Structural spec check: Use the explicit candidate tokens to verify deployment type
+                        const isLocalStack = c.includes("typ host");
+                        const isPublicStack = c.includes("typ srflx") || c.includes("typ prflx") || c.includes("typ relay");
+
+                        if (isLocalStack || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|fe80:|fd|fc)/i.test(ip) || ip.endsWith('.local')) {
+                            locals.add(ip);
+                        } else if (isPublicStack || !ip.endsWith('.local')) {
+                            publics.add(ip);
+                        }
+                    };
+                    
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    
+                    setTimeout(() => {
+                        set('webrtc-local', locals.size ? [...locals].join(', ') : 'none observed (mDNS obfuscation likely)');
+                        set('webrtc-public', publics.size ? [...publics].join(', ') : 'none observed');
+                        pc.close();
+                    }, 2500);
+                } catch {
+                    set('webrtc-local', 'blocked');
+                    set('webrtc-public', 'blocked');
+                }
         })();
     </script>
 
